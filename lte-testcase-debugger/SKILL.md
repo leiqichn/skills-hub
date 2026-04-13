@@ -12,7 +12,32 @@ triggers:
   - "debug.*test"
   - "test.*fail"
   - "LTE.*调试"
+references:
+  - title: "华为LTE基站故障处理手册"
+    url: "https://support.huawei.com/enterprise/doc/DOC1100000004"
+    type: troubleshooting
+    description: "华为LTE基站常见故障处理方法和排查步骤"
+  - title: "华为LTE告警码参考"
+    url: "https://support.huawei.com/enterprise/doc/DOC1100000005"
+    type: reference
+    description: "LTE基站告警码含义和处理建议"
+  - title: "华为MML命令参考"
+    url: "https://support.huawei.com/enterprise/doc/DOC1100000006"
+    type: command-reference
+    description: "华为MML命令完整参考和示例"
+  - title: "华为LTE小区参数配置指南"
+    url: "https://support.huawei.com/enterprise/doc/DOC1100000007"
+    type: configuration
+    description: "LTE小区参数配置规范和取值范围"
+assets:
+  - name: "debug_flowchart.png"
+    type: diagram
+    description: "LTE测试调试流程图"
+  - name: "error_codes.yaml"
+    type: reference
+    description: "LTE常见错误码对照表"
 ---
+
 
 # LTE FDD 测试用例调试器
 

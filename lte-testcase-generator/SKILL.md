@@ -13,7 +13,28 @@ triggers:
   - "test case.*similar"
   - "find similar.*test"
   - "generate.*test case"
+references:
+  - title: "华为LTE基站测试规范"
+    url: "https://support.huawei.com/enterprise/doc/DOC1100000001"
+    type: documentation
+    description: "华为LTE基站测试用例设计规范和模板"
+  - title: "华为TestSuite测试框架"
+    url: "https://support.huawei.com/enterprise/doc/DOC1100000002"
+    type: reference
+    description: "华为官方TestSuite自动化测试框架使用指南"
+  - title: "华为LTE API参考"
+    url: "https://support.huawei.com/enterprise/doc/DOC1100000003"
+    type: api
+    description: "LTE测试API接口说明和参数定义"
+assets:
+  - name: "LTE_Test_Template.py"
+    type: code-template
+    description: "标准LTE测试用例代码模板"
+  - name: "testcase_spec.yaml"
+    type: config-template
+    description: "测试用例规格YAML模板"
 ---
+
 
 # LTE FDD 测试用例生成器
 

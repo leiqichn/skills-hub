@@ -128,6 +128,13 @@ def setUp(self):
     self.lte_api = LTE_API()
     self.lte_api.set_timeout(30)  # 增加超时时间
     self.lte_api.connect('192.168.1.100')  # 确保 IP 正确
+
+    # 验证连接状态
+    if not self.lte_api.is_connected():
+        raise ConnectionError("基站连接失败")
+
+    # 等待小区就绪
+    self._wait_for_cell_ready()
 ```
 
 ### UE附着失败
@@ -137,14 +144,31 @@ def setUp(self):
 # 修复：
 def test_ue_attach(self):
     max_retries = 3
-    for i in range(max_retries):
+    retry_delay = 5
+
+    for attempt in range(max_retries):
         try:
             self.ue = self.lte_api.attach_ue()
-            break
+            # 验证附着成功
+            if not self._verify_attach(self.ue):
+                raise AttachError("UE附着验证失败")
+            logger.info(f"UE {self.ue.imsi} 附着成功")
+            return
         except AttachError as e:
-            if i == max_retries - 1:
-                raise
-            time.sleep(5)  # 重试前等待
+            logger.warning(f"附着尝试 {attempt + 1} 失败: {e}")
+            if attempt < max_retries - 1:
+                logger.info(f"等待 {retry_delay}s 后重试...")
+                time.sleep(retry_delay)
+            else:
+                raise AttachError(f"UE附着失败，已重试 {max_retries} 次")
+
+def _verify_attach(self, ue):
+    """验证UE附着状态"""
+    try:
+        status = self.lte_api.get_ue_status(ue.id)
+        return status.state == 'attached'
+    except:
+        return False
 ```
 
 ### 吞吐量测量不准确
@@ -155,14 +179,30 @@ def test_ue_attach(self):
 def test_throughput(self):
     # 确保数据传输真正开始
     self.udp.start()
-    time.sleep(2)  # 等待数据传输稳定
+
+    # 等待数据传输稳定
+    time.sleep(self._get_stabilization_time())
 
     # 确保测量时间足够长
-    result = self.udp.measure_throughput(duration=10)
+    measurement_duration = self._get_measurement_duration()
+    result = self.udp.measure_throughput(duration=measurement_duration)
 
     # 防御性断言
     self.assertIsNotNone(result, "Throughput measurement returned None")
+    self.assertIsNotNone(result.peak, "Peak throughput is None")
     self.assertGreater(result.peak, 0, "Peak throughput is 0")
+
+    # 记录详细诊断信息
+    logger.info(f"吞吐量测量: peak={result.peak}, avg={result.average}")
+
+def _get_stabilization_time(self):
+    """获取传输稳定等待时间"""
+    # 可配置的等待时间
+    return self._test_config.get('stabilization_time', 5)
+
+def _get_measurement_duration(self):
+    """获取测量持续时间"""
+    return self._test_config.get('measurement_duration', 10)
 ```
 
 ### 清理失败导致后续测试受影响
@@ -171,13 +211,96 @@ def test_throughput(self):
 # 问题：tearDown 清理不完整
 # 修复：
 def tearDown(self):
+    # 使用 try-finally 确保清理总是执行
+    cleanup_warnings = []
+
     try:
-        if hasattr(self, 'udp'):
-            self.udp.stop()
-        if hasattr(self, 'ue'):
-            self.lte_api.release_ue(self.ue)
-    except Exception as e:
-        print(f"Cleanup warning: {e}")  # 不要让清理失败影响测试结果
+        # 停止 UDP 传输
+        if hasattr(self, 'udp') and self.udp:
+            try:
+                self.udp.stop()
+                logger.debug("UDP 传输已停止")
+            except Exception as e:
+                cleanup_warnings.append(f"UDP停止: {e}")
+
+        # 释放 UE
+        if hasattr(self, 'ue') and self.ue:
+            try:
+                self.lte_api.release_ue(self.ue)
+                logger.debug(f"UE {self.ue.id} 已释放")
+            except Exception as e:
+                cleanup_warnings.append(f"UE释放: {e}")
+
+        # 断开连接
+        if hasattr(self, 'lte_api') and self.lte_api:
+            try:
+                self.lte_api.disconnect()
+                logger.debug("LTE API 已断开")
+            except Exception as e:
+                cleanup_warnings.append(f"断开连接: {e}")
+
+    finally:
+        # 即使清理失败也记录警告
+        if cleanup_warnings:
+            logger.warning(f"tearDown 清理警告: {cleanup_warnings}")
+            # 不要让清理失败影响测试结果报告
+```
+
+## LTE 特定错误深度分析
+
+### 1. SNR/信号质量问题
+
+```
+错误: AssertionError: SNR 3.2dB < 10dB
+可能原因:
+  - 天线连接问题
+  - 频偏配置错误
+  - 干扰源
+修复:
+  1. 检查天线连接器
+  2. 验证频点配置
+  3. 扫描干扰信号
+```
+
+### 2. HARQ重传率过高
+
+```
+错误: AssertionError: HARQ retransmission rate 35% > 20%
+可能原因:
+  - CQI反馈不及时
+  - 下行干扰
+  - 信道条件差
+修复:
+  1. 检查 PDCCH 配置
+  2. 验证信道条件
+  3. 调整目标 BLER
+```
+
+### 3. 调度算法问题
+
+```
+错误: 预期调度 50 PRB，实际 30 PRB
+可能原因:
+  - 调度器配置问题
+  - PMI/CQI 反馈异常
+  - 优先级配置错误
+修复:
+  1. 检查调度器参数
+  2. 验证 CQI 报告
+  3. 检查优先级设置
+```
+
+### 4. 功率控制问题
+
+```
+错误: UE TX power -10dBm > 0dBm
+可能原因:
+  - 功率控制配置错误
+  - 开环功率控制参数
+修复:
+  1. 检查 P0_PUSCH 配置
+  2. 验证路径损耗估算
+  3. 检查 alpha 参数
 ```
 
 ## 调试输出格式
@@ -185,31 +308,39 @@ def tearDown(self):
 ### 错误分析报告
 
 ```
-=== LTE 测试用例调试报告 ===
-用例: test_embb_dl_throughput
-文件: test_throughput_embb.py
-行号: 42
-
-错误类型: AssertionError
-错误信息: Peak rate 0 < 100Mbps
-
-可能原因:
-1. UDP 数据传输未正常启动
-2. 测量持续时间太短
-3. 网络配置问题
-
-修复建议:
-1. 在测量前添加 delay 确保数据传输稳定
-2. 增加测量持续时间到 10 秒
-3. 检查基站和 UE 的带宽配置
-
-应用修复: 是
+╔══════════════════════════════════════════════════════════════════╗
+║                   LTE 测试用例调试报告                           ║
+╠══════════════════════════════════════════════════════════════════╣
+║ 用例: test_embb_dl_throughput                                   ║
+║ 文件: test_throughput_embb.py                                    ║
+║ 行号: 42                                                        ║
+╠══════════════════════════════════════════════════════════════════╣
+║ 错误类型: AssertionError                                         ║
+║ 错误信息: Peak rate 0 < 100Mbps                                  ║
+╠══════════════════════════════════════════════════════════════════╣
+║ 可能原因:                                                       ║
+║   1. UDP 数据传输未正常启动                                      ║
+║   2. 测量持续时间太短                                            ║
+║   3. 网络配置问题                                                ║
+╠══════════════════════════════════════════════════════════════════╣
+║ 修复建议:                                                       ║
+║   1. 在测量前添加 delay 确保数据传输稳定                         ║
+║   2. 增加测量持续时间到 10 秒                                    ║
+║   3. 检查基站和 UE 的带宽配置                                    ║
+╠══════════════════════════════════════════════════════════════════╣
+║ 调试历史:                                                       ║
+║   尝试 1: 增加测量前等待时间 (2s → 5s) - 失败                  ║
+║   尝试 2: 增加测量持续时间 (5s → 10s) - 失败                    ║
+║   尝试 3: 检查 UDP 配置 - 成功 ✓                                ║
+╚══════════════════════════════════════════════════════════════════╝
 ```
 
 ### 修复后的测试输出
 
 ```
-=== 测试执行结果 ===
+============================================================
+ 测试执行结果
+============================================================
 用例: test_embb_dl_throughput
 状态: ✓ 通过
 执行时间: 12.3s
@@ -220,6 +351,36 @@ def tearDown(self):
   1. 增加测量前等待时间 (2s → 5s)
   2. 增加测量持续时间 (5s → 10s)
   3. 添加详细的诊断日志
+============================================================
+```
+
+## 调试策略建议
+
+### 1. 二分法调试
+
+当测试失败原因不明确时：
+```
+1. 简化测试条件（最小配置）
+2. 如果仍然失败 → 问题在环境/Setup
+3. 如果通过 → 逐步增加复杂度
+```
+
+### 2. 对比法调试
+
+当有多个相似测试时：
+```
+1. 找一个必定通过的用例
+2. 对比两个用例的差异
+3. 差异点即为问题所在
+```
+
+### 3. 隔离法调试
+
+当测试相互影响时：
+```
+1. 只运行失败的测试
+2. 如果通过 → 之前测试遗留状态
+3. 如果失败 → 问题在当前测试
 ```
 
 ## 与 lte-testcase-generator 配合
@@ -237,3 +398,5 @@ def tearDown(self):
 3. **记录修复历史**：方便后续回溯
 4. **不要跳过断言**：修复不是绕过问题，而是正确解决问题
 5. **确保环境干净**：每次调试前确认环境状态
+6. **保存堆栈信息**：便于后续分析
+7. **检查资源释放**：确保测试间无资源泄露

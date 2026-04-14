@@ -12,6 +12,7 @@ LTE 测试自动化 Skill 生态系统
 | [lte-testcase-debugger](./lte-testcase-debugger/) | LTE 测试用例调试器 | 分析错误、定位问题、生成修复方案 |
 | [lte-similar-steps-finder](./lte-similar-steps-finder/) | LTE 相似步骤查找器 | 分层搜索相似测试步骤 |
 | [lte-test-runner](./lte-test-runner/) | LTE 测试执行引擎 | 自动执行测试、迭代调试修复 |
+| [lte-report-generator](./lte-report-generator/) | LTE 测试报告生成器 | 生成 JSON/Markdown/HTML 测试报告 |
 | [lte-cell-creation-huawei](./lte-cell-creation-huawei/) | 华为 LTE 小区创建工具 | 通过 MML 命令创建和配置 LTE 小区 |
 
 ### 架构图
@@ -48,6 +49,12 @@ LTE 测试自动化 Skill 生态系统
 │  ┌─────────────────────┐                                        │
 │  │ lte-testcase-       │  ← 分析错误 + 生成修复建议              │
 │  │ debugger            │                                        │
+│  └──────────┬──────────┘                                        │
+│             │                                                   │
+│             ▼                                                   │
+│  ┌─────────────────────┐                                        │
+│  │ lte-report-         │  ← 生成测试报告 (JSON/MD/HTML)        │
+│  │ generator           │                                        │
 │  └─────────────────────┘                                        │
 │                                                                  │
 └─────────────────────────────────────────────────────────────────┘

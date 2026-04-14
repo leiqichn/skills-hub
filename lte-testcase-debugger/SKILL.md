@@ -29,14 +29,18 @@ references:
     url: "https://support.huawei.com/enterprise/doc/DOC1100000007"
     type: configuration
     description: "LTE小区参数配置规范和取值范围"
-  - title: "lte-mock-api"
-    url: "../lte-mock-api/SKILL.md"
-    type: skill
-    description: "LTE Mock API框架，提供不依赖真实基站的测试环境"
   - title: "lte-test-runner"
     url: "../lte-test-runner/SKILL.md"
     type: skill
     description: "LTE测试自动执行与迭代修复引擎"
+  - title: "lte-testcase-generator"
+    url: "../lte-testcase-generator/SKILL.md"
+    type: skill
+    description: "LTE测试用例生成器"
+  - title: "lte-similar-steps-finder"
+    url: "../lte-similar-steps-finder/SKILL.md"
+    type: skill
+    description: "LTE相似步骤查找器，用于分层搜索"
 assets:
   - name: "debug_flowchart.png"
     type: diagram

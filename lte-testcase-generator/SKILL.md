@@ -26,6 +26,14 @@ references:
     url: "https://support.huawei.com/enterprise/doc/DOC1100000003"
     type: api
     description: "LTE测试API接口说明和参数定义"
+  - title: "lte-mock-api"
+    url: "../lte-mock-api/SKILL.md"
+    type: skill
+    description: "LTE Mock API框架，提供不依赖真实基站的测试环境"
+  - title: "lte-test-runner"
+    url: "../lte-test-runner/SKILL.md"
+    type: skill
+    description: "LTE测试自动执行与迭代修复引擎"
 assets:
   - name: "LTE_Test_Template.py"
     type: code-template
@@ -392,17 +400,58 @@ def validate_test_result(result: Dict[str, Any], thresholds: Dict[str, float]) -
 
 3. **相似用例信息**：显示找到的相似用例及其相似度分数
 
-## 调试循环
+## 完整闭环流程
 
-生成的测试用例可能需要调试。如果测试执行失败，使用 **lte-testcase-debugger skill** 进行迭代修复：
+本 skill 是 LTE 测试闭环的核心环节之一，与其他 skill 形成完整测试流程：
 
 ```
-当测试失败时 → 调用 lte-testcase-debugger → 修复代码 → 重新执行 → 循环直到通过
+┌─────────────────────┐
+│ lte-testcase-       │
+│ generator           │
+│ (生成测试用例)       │
+└──────────┬──────────┘
+           │
+           ▼
+┌─────────────────────┐
+│ lte-test-runner     │
+│ (执行 + 自动调试)    │
+└──────────┬──────────┘
+           │
+           ▼
+┌─────────────────────┐
+│ lte-mock-api        │
+│ (提供Mock环境)      │
+└─────────────────────┘
 ```
 
-## 与 lte-testcase-debugger 配合
+## 与 lte-test-runner 配合（推荐）
 
-生成代码后：
-1. **立即尝试运行**：使用 nosetests 执行测试
-2. **失败时调用 debugger**：当测试失败时，调用 `lte-testcase-debugger` skill 进行诊断和修复
-3. **迭代优化**：不断修复直到所有断言通过
+生成代码后，推荐使用 **lte-test-runner** 进行自动执行和调试：
+
+```python
+from test_runner import LTETestRunner
+
+runner = LTETestRunner()
+result = runner.generate_and_run(spec, output_dir='./test_cases')
+```
+
+runner 会自动：
+1. 调用本 skill 生成测试代码
+2. 使用 lte-mock-api 提供 Mock 环境
+3. 执行测试
+4. 如果失败，自动调用 debugger 进行迭代修复
+5. 循环直到测试通过或达到最大迭代次数
+
+## 与 lte-testcase-debugger 配合（手动模式）
+
+如果不想使用自动 runner，可以手动调用 debugger：
+
+```
+生成代码 → nosetests 执行 → 失败 → 调用 lte-testcase-debugger → 修复 → 重新执行 → 循环
+```
+
+当测试失败时：
+1. **调用 lte-testcase-debugger skill**：分析错误并生成修复方案
+2. **应用修复**：根据 debugger 建议修改代码
+3. **重新执行**：再次运行 nosetests
+4. **迭代优化**：不断修复直到所有断言通过

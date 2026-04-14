@@ -29,6 +29,14 @@ references:
     url: "https://support.huawei.com/enterprise/doc/DOC1100000007"
     type: configuration
     description: "LTE小区参数配置规范和取值范围"
+  - title: "lte-mock-api"
+    url: "../lte-mock-api/SKILL.md"
+    type: skill
+    description: "LTE Mock API框架，提供不依赖真实基站的测试环境"
+  - title: "lte-test-runner"
+    url: "../lte-test-runner/SKILL.md"
+    type: skill
+    description: "LTE测试自动执行与迭代修复引擎"
 assets:
   - name: "debug_flowchart.png"
     type: diagram
@@ -407,6 +415,54 @@ def tearDown(self):
 2. 如果通过 → 之前测试遗留状态
 3. 如果失败 → 问题在当前测试
 ```
+
+## 完整闭环流程
+
+本 skill 是 LTE 测试闭环的核心环节之一，与其他 skill 形成完整测试流程：
+
+```
+┌─────────────────────┐
+│ lte-testcase-       │
+│ generator           │
+│ (生成测试用例)       │
+└──────────┬──────────┘
+           │
+           ▼
+┌─────────────────────┐
+│ lte-test-runner     │
+│ (执行 + 自动调试)    │
+└──────────┬──────────┘
+           │
+           ▼
+┌─────────────────────┐
+│ lte-testcase-       │
+│ debugger ← 你在这里  │
+│ (分析 + 修复)       │
+└──────────┬──────────┘
+           │
+           ▼
+┌─────────────────────┐
+│ lte-mock-api        │
+│ (提供Mock环境)      │
+└─────────────────────┘
+```
+
+## 与 lte-test-runner 配合（推荐）
+
+推荐使用 **lte-test-runner** 进行自动调试：
+
+```python
+from test_runner import LTETestRunner
+
+runner = LTETestRunner()
+result = runner.run(
+    test_file='test_cases/test_sample.py',
+    auto_debug=True,  # 启用自动调试
+    max_iterations=5
+)
+```
+
+runner 会自动调用本 skill 进行错误分析和修复。
 
 ## 与 lte-testcase-generator 配合
 
